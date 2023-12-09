@@ -1,0 +1,110 @@
+---
+title: "437 Machine Learning Project"
+output: html_document
+date: "2023-11-29"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# import essential libraries
+
+```{r}
+library(tidyverse)
+library(lubridate)
+```
+
+# load files
+
+```{r}
+powerConsumption = read.csv("household_power_consumption_comma.txt", sep=",", header = TRUE)
+weather = read.csv("Paris,France 2006-12-01 to 2010-11-30.csv", sep=",", header = TRUE)
+```
+# convert the variables that should be numeric to numberic
+
+```{r}
+powerConsumption$Global_active_power <- as.numeric(powerConsumption$Global_active_power)
+
+powerConsumption$Global_reactive_power <- as.numeric(powerConsumption$Global_reactive_power)
+
+powerConsumption$Voltage <- as.numeric(powerConsumption$Voltage)
+
+powerConsumption$Global_intensity <- as.numeric(powerConsumption$Global_intensity)
+
+powerConsumption$Sub_metering_1 <- as.numeric(powerConsumption$Sub_metering_1)
+
+powerConsumption$Sub_metering_2 <- as.numeric(powerConsumption$Sub_metering_2)
+
+
+summary(powerConsumption)
+```
+
+# remove unimportant weather variables
+
+Here, by looking at the summary, we can see that we can drop severerisk, since it is entirely 0.
+
+Additionally, many of these variables do have a lot of NA's which will be a challenge that we will need to deal with.
+
+That said, things like UV index that has many missing data points can also be excluded because it will be significantly less tied to electricity usage. In a similar vein, we can potentially exclude things like precipprob because we have the data of what actually happened. However, since there could be real world advantages of being able to use just predictions to predict future usage, we may keep it in.
+
+Because of the fact that there was no solar data at all before 2010, we will likely disregard all of the solar data for the initial training, only looking to focus in on the 2010 solar data if we deem it important for explaining certain behaviors.
+
+Additionally, we will be ignoring the windgust data because it has significant amounts of missing values and the overall wind speed data will likely be a more influential factor on heating usage.
+
+```{r}
+conciseWeather <- weather %>%
+  select(-severerisk, -stations, -icon, -name, -windgust, -uvindex, -solarradiation, -solarenergy, -winddir, -preciptype, -conditions, -datetime)
+
+summary(conciseWeather)
+
+```
+
+# convert powerConsumptions datetime to POSIXct
+
+```{r}
+powerConsumption$datetime <- as.POSIXct(paste(powerConsumption$Date, powerConsumption$Time), format = "%d/%m/%Y %H:%M:%S", tz = "UTC")
+```
+
+# convert weather datetime to POSIXct
+
+```{r}
+weather$newDatetime <- as.POSIXct(weather$datetime, format = "%Y-%m-%dT%H:%M:%S")
+
+
+```
+
+# prepare powerConsumption for merging
+what is intensity? should voltage be averaged rather than summed?
+
+```{r}
+newPowerConsumption <- powerConsumption %>%
+  select(-Date, -Time) %>%
+  mutate(hour = floor_date(datetime, "hour")) %>%
+  group_by(hour) %>%
+  summarise(
+    GlobalActivePower = sum(Global_active_power),
+    GlobalReactivePower = sum(Global_reactive_power),
+    SubMeter1 = sum(Sub_metering_1),
+    SubMeter2 = sum(Sub_metering_2),
+    SubMeter3 = sum(Sub_metering_3),
+    Voltage = mean(Voltage)
+  )
+  
+```
+
+# perform merging
+
+```{r}
+merged <-left_join(newPowerConsumption, conciseWeather, by = c("hour" = "newDatetime"))
+```
+
+# Create one large dataset csv with all the data
+```{r}
+write.csv(merged, "mergedFile.csv", row.names = FALSE)
+```
+
+Create X / y datasets
+```{r}
+write.csv()
+```
